@@ -6,7 +6,7 @@
  */
 
 import { useState } from 'react'
-import { ApiError, searchDiscovery } from '../api/client'
+import { ApiError, MINIMAL_DISCOVERY_LIMITS, searchDiscovery } from '../api/client'
 import type { DiscoveryResponse } from '../api/types'
 
 interface SearchPanelProps {
@@ -24,7 +24,9 @@ function parseList(value: string): string[] {
 export function SearchPanel({ onResults, disabled }: SearchPanelProps) {
   const [segment, setSegment] = useState('')
   const [seeds, setSeeds] = useState('')
-  const [maxAccounts, setMaxAccounts] = useState(20)
+  const [maxAccounts, setMaxAccounts] = useState(MINIMAL_DISCOVERY_LIMITS.max_accounts)
+  const [maxCandidates, setMaxCandidates] = useState(MINIMAL_DISCOVERY_LIMITS.max_candidates)
+  const [maxPosts, setMaxPosts] = useState(MINIMAL_DISCOVERY_LIMITS.max_posts_per_account)
   const [includeBots, setIncludeBots] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -47,6 +49,8 @@ export function SearchPanel({ onResults, disabled }: SearchPanelProps) {
         target_segment: targetSegment,
         seed_accounts: seedAccounts,
         max_accounts: maxAccounts,
+        max_candidates: maxCandidates,
+        max_posts_per_account: maxPosts,
         include_bots: includeBots,
       })
       onResults(response)
@@ -128,6 +132,40 @@ export function SearchPanel({ onResults, disabled }: SearchPanelProps) {
             </div>
           </div>
         </div>
+
+        <details className="field">
+          <summary>Budget limits</summary>
+          <div className="hint">
+            These bound how much of the X API budget one run may spend. Keep them
+            low while testing.
+          </div>
+          <div className="field-row">
+            <div>
+              <label htmlFor="max-candidates">Max candidates</label>
+              <input
+                id="max-candidates"
+                type="number"
+                min={1}
+                max={500}
+                value={maxCandidates}
+                onChange={(event) => setMaxCandidates(Number(event.target.value))}
+                disabled={disabled}
+              />
+            </div>
+            <div>
+              <label htmlFor="max-posts">Max posts per account</label>
+              <input
+                id="max-posts"
+                type="number"
+                min={0}
+                max={100}
+                value={maxPosts}
+                onChange={(event) => setMaxPosts(Number(event.target.value))}
+                disabled={disabled}
+              />
+            </div>
+          </div>
+        </details>
 
         <button type="submit" className="primary" disabled={busy || disabled}>
           {busy ? <span className="spinner" /> : null} Search accounts

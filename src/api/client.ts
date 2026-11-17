@@ -101,6 +101,28 @@ export interface SearchRequest {
   bot_score_threshold?: number
 }
 
+/**
+ * The discovery limits, as sent to the backend.
+ *
+ * Every one of these drives how much of the X API budget a run may spend:
+ * `max_candidates` bounds the number of profiles fetched, and
+ * `max_posts_per_account` bounds the timeline reads per profile. They are
+ * always sent explicitly (never left to the backend default) so a run's
+ * cost is predictable and can be kept minimal.
+ */
+export interface DiscoveryLimits {
+  max_accounts: number
+  max_candidates: number
+  max_posts_per_account: number
+}
+
+/** The cheapest limits that still satisfy the backend schema. */
+export const MINIMAL_DISCOVERY_LIMITS: DiscoveryLimits = {
+  max_accounts: 1,
+  max_candidates: 1,
+  max_posts_per_account: 0,
+}
+
 /** Run a discovery search for accounts matching a segment and/or seeds. */
 export function searchDiscovery(request: SearchRequest): Promise<DiscoveryResponse> {
   return apiFetch<DiscoveryResponse>('/api/v1/discovery/search', {
