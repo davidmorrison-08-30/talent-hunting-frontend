@@ -66,13 +66,16 @@ jobs:
           jq 'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)' \
             task-definition-new.json > task-definition-clean.json
           aws ecs register-task-definition \
-            --cli-input-json file://task-definition-clean.json > /dev/null
+            --cli-input-json file://task-definition-clean.json \
+            --query taskDefinition.taskDefinitionArn --output text > task-definition-arn.txt
+          echo "registered $(cat task-definition-arn.txt)"
 
       - name: Update the ECS service
         run: |
           aws ecs update-service \
             --cluster "$ECS_CLUSTER" \
             --service "$ECS_SERVICE" \
+            --task-definition "$(cat task-definition-arn.txt)" \
             --force-new-deployment > /dev/null
           aws ecs wait services-stable \
             --cluster "$ECS_CLUSTER" \
