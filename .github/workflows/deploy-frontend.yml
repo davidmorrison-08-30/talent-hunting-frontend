@@ -76,8 +76,7 @@ jobs:
             --force-new-deployment > /dev/null
           aws ecs wait services-stable \
             --cluster "$ECS_CLUSTER" \
-            --services "$ECS_SERVICE" \
-            --timeout 600
+            --services "$ECS_SERVICE"
 
       - name: Verify the service is healthy
         run: |
