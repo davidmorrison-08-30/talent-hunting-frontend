@@ -74,6 +74,12 @@ export default function App() {
     void refreshAccounts()
   }
 
+  // A new search removes the previous accounts from the server, so the chat
+  // panel is emptied as soon as the search starts rather than when it ends.
+  const handleSearchStarted = () => {
+    setSelected(null)
+  }
+
   const handleSelectDraft = (draft: DraftResponse) => {
     const match = accounts.find((account) => account.x_user_id === draft.x_user_id)
     if (match) {
@@ -105,7 +111,11 @@ export default function App() {
       <main className="app-main">
         <div>
           <AuthPanel status={status} onStatusChange={setStatus} />
-          <SearchPanel onRunComplete={handleResults} disabled={!connected} />
+          <SearchPanel
+            onRunComplete={handleResults}
+            onSearchStarted={handleSearchStarted}
+            disabled={!connected}
+          />
           <QueuePanel refreshKey={queueKey} onSelectDraft={handleSelectDraft} />
         </div>
 
@@ -124,6 +134,9 @@ export default function App() {
                 <span>{Number(lastRun.stats.bots_filtered ?? 0)} bots filtered</span>
                 <span>{Number(lastRun.stats.returned ?? 0)} returned</span>
                 <span>${Number(lastRun.stats.estimated_cost_usd ?? 0).toFixed(4)}</span>
+                {Number(lastRun.stats.humans_bypassed ?? 0) > 0 && (
+                  <span>{Number(lastRun.stats.humans_bypassed)} known humans</span>
+                )}
               </div>
               {lastRun.target_segment.length > 0 && (
                 <div className="account-meta" style={{ marginBottom: 8 }}>

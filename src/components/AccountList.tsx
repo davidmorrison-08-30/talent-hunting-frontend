@@ -53,6 +53,9 @@ export function AccountList({ accounts, selectedId, onSelect }: AccountListProps
                 </span>
                 {account.bot_verdict === 'human' && <span className="badge ok">human</span>}
                 {account.bot_verdict === 'likely_bot' && <span className="badge err">bot</span>}
+                {account.segment_tags.includes('known_human') && (
+                  <span className="badge ok">known human</span>
+                )}
               </div>
               <div className="handle">@{account.username}</div>
               {account.bio && <div className="bio">{account.bio}</div>}

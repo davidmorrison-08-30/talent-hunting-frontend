@@ -13,6 +13,7 @@ import type { DiscoveryRunSummary } from '../api/types'
 
 interface SearchPanelProps {
   onRunComplete: (run: DiscoveryRunSummary) => void
+  onSearchStarted: () => void
   disabled: boolean
 }
 
@@ -23,9 +24,10 @@ function parseList(value: string): string[] {
     .filter(Boolean)
 }
 
-export function SearchPanel({ onRunComplete, disabled }: SearchPanelProps) {
+export function SearchPanel({ onRunComplete, onSearchStarted, disabled }: SearchPanelProps) {
   const [segment, setSegment] = useState('')
   const [seeds, setSeeds] = useState('')
+  const [knownHumans, setKnownHumans] = useState('')
   const [maxAccounts, setMaxAccounts] = useState(MINIMAL_DISCOVERY_LIMITS.max_accounts)
   const [maxCandidates, setMaxCandidates] = useState(MINIMAL_DISCOVERY_LIMITS.max_candidates)
   const [maxPosts, setMaxPosts] = useState(MINIMAL_DISCOVERY_LIMITS.max_posts_per_account)
@@ -41,17 +43,23 @@ export function SearchPanel({ onRunComplete, disabled }: SearchPanelProps) {
 
     const targetSegment = parseList(segment)
     const seedAccounts = parseList(seeds)
+    const knownHumanAccounts = parseList(knownHumans)
 
     if (targetSegment.length === 0 && seedAccounts.length === 0) {
       setError('Provide at least one target segment keyword or one seed account.')
       return
     }
 
+    // The old accounts and their chats are gone from the server as soon as
+    // the new search starts, so the chat panel is emptied right away.
+    onSearchStarted()
+
     setBusy(true)
     try {
       const accepted = await searchDiscovery({
         target_segment: targetSegment,
         seed_accounts: seedAccounts,
+        known_human_accounts: knownHumanAccounts,
         max_accounts: maxAccounts,
         max_candidates: maxCandidates,
         max_posts_per_account: maxPosts,
@@ -115,6 +123,21 @@ export function SearchPanel({ onRunComplete, disabled }: SearchPanelProps) {
             disabled={disabled}
           />
           <div className="hint">X profile URLs. Their posts are analysed to refine the segment.</div>
+        </div>
+
+        <div className="field">
+          <label htmlFor="known-humans">Human accounts you know</label>
+          <textarea
+            id="known-humans"
+            value={knownHumans}
+            onChange={(event) => setKnownHumans(event.target.value)}
+            placeholder={'https://x.com/someone\nhttps://x.com/someone-else'}
+            disabled={disabled}
+          />
+          <div className="hint">
+            One X profile URL per line. These accounts are treated as human and skip bot
+            detection.
+          </div>
         </div>
 
         <div className="field">

@@ -95,6 +95,7 @@ export function disconnect(): Promise<{ detail?: string }> {
 export interface SearchRequest {
   target_segment: string[]
   seed_accounts: string[]
+  known_human_accounts: string[]
   max_accounts: number
   max_candidates?: number
   max_posts_per_account?: number
