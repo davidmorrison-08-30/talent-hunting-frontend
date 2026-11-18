@@ -2,15 +2,17 @@
  * Discovery search panel.
  *
  * Collects the target segment and/or seed accounts and kicks off
- * `POST /api/v1/discovery/search`.
+ * `POST /api/v1/discovery/search`. The search runs in the background on the
+ * server, so the panel polls the run until it finishes and then reports what
+ * it found.
  */
 
 import { useState } from 'react'
-import { ApiError, MINIMAL_DISCOVERY_LIMITS, searchDiscovery } from '../api/client'
-import type { DiscoveryResponse } from '../api/types'
+import { ApiError, MINIMAL_DISCOVERY_LIMITS, searchDiscovery, waitForDiscoveryRun } from '../api/client'
+import type { DiscoveryRunSummary } from '../api/types'
 
 interface SearchPanelProps {
-  onResults: (response: DiscoveryResponse) => void
+  onRunComplete: (run: DiscoveryRunSummary) => void
   disabled: boolean
 }
 
@@ -21,7 +23,7 @@ function parseList(value: string): string[] {
     .filter(Boolean)
 }
 
-export function SearchPanel({ onResults, disabled }: SearchPanelProps) {
+export function SearchPanel({ onRunComplete, disabled }: SearchPanelProps) {
   const [segment, setSegment] = useState('')
   const [seeds, setSeeds] = useState('')
   const [maxAccounts, setMaxAccounts] = useState(MINIMAL_DISCOVERY_LIMITS.max_accounts)
@@ -29,11 +31,13 @@ export function SearchPanel({ onResults, disabled }: SearchPanelProps) {
   const [maxPosts, setMaxPosts] = useState(MINIMAL_DISCOVERY_LIMITS.max_posts_per_account)
   const [includeBots, setIncludeBots] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [status, setStatus] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
     setError(null)
+    setStatus(null)
 
     const targetSegment = parseList(segment)
     const seedAccounts = parseList(seeds)
@@ -45,7 +49,7 @@ export function SearchPanel({ onResults, disabled }: SearchPanelProps) {
 
     setBusy(true)
     try {
-      const response = await searchDiscovery({
+      const accepted = await searchDiscovery({
         target_segment: targetSegment,
         seed_accounts: seedAccounts,
         max_accounts: maxAccounts,
@@ -53,11 +57,22 @@ export function SearchPanel({ onResults, disabled }: SearchPanelProps) {
         max_posts_per_account: maxPosts,
         include_bots: includeBots,
       })
-      onResults(response)
+
+      setStatus('Search started. Waiting for the run to finish...')
+      const run = await waitForDiscoveryRun(accepted.run_id, {
+        onTick: () => setStatus('Search running...'),
+      })
+
+      if (run.status === 'FAILED') {
+        const detail = run.stats?.error
+        throw new ApiError(0, 'discovery_failed', typeof detail === 'string' ? detail : 'The search failed.')
+      }
+      onRunComplete(run)
     } catch (cause) {
       setError(cause instanceof ApiError ? cause.message : String(cause))
     } finally {
       setBusy(false)
+      setStatus(null)
     }
   }
 
@@ -68,6 +83,12 @@ export function SearchPanel({ onResults, disabled }: SearchPanelProps) {
       {error && (
         <div className="alert error" role="alert">
           {error}
+        </div>
+      )}
+
+      {status && (
+        <div className="alert info" role="status">
+          {status}
         </div>
       )}
 

@@ -11,7 +11,8 @@ import type {
   AccountRecord,
   ApiErrorBody,
   ConversationEvent,
-  DiscoveryResponse,
+  DiscoveryAccepted,
+  DiscoveryRunSummary,
   DraftResponse,
   OAuthStartResponse,
   OAuthStatus,
@@ -124,11 +125,43 @@ export const MINIMAL_DISCOVERY_LIMITS: DiscoveryLimits = {
 }
 
 /** Run a discovery search for accounts matching a segment and/or seeds. */
-export function searchDiscovery(request: SearchRequest): Promise<DiscoveryResponse> {
-  return apiFetch<DiscoveryResponse>('/api/v1/discovery/search', {
+export function searchDiscovery(request: SearchRequest): Promise<DiscoveryAccepted> {
+  return apiFetch<DiscoveryAccepted>('/api/v1/discovery/search', {
     method: 'POST',
     body: JSON.stringify(request),
   })
+}
+
+/** The status of a discovery run. */
+export function getDiscoveryRun(runId: string): Promise<DiscoveryRunSummary> {
+  return apiFetch<DiscoveryRunSummary>(`/api/v1/discovery/runs/${runId}`)
+}
+
+/**
+ * Wait for a discovery run to finish and report how it ended.
+ *
+ * The run works in the background because it waits on the X API and on
+ * several LLM inferences, which takes far longer than the gateway may hold
+ * a connection open. The poll interval is generous because each poll is a
+ * round trip to the API.
+ */
+export async function waitForDiscoveryRun(
+  runId: string,
+  options: { timeoutMs?: number; intervalMs?: number; onTick?: () => void } = {},
+): Promise<DiscoveryRunSummary> {
+  const timeoutMs = options.timeoutMs ?? 15 * 60 * 1000
+  const intervalMs = options.intervalMs ?? 3000
+  const deadline = Date.now() + timeoutMs
+
+  while (Date.now() < deadline) {
+    const run = await getDiscoveryRun(runId)
+    options.onTick?.()
+    if (run.status !== 'RUNNING' && run.status !== 'PENDING') {
+      return run
+    }
+    await new Promise((resolve) => setTimeout(resolve, intervalMs))
+  }
+  throw new ApiError(0, 'poll_timeout', `The search did not finish within ${Math.round(timeoutMs / 1000)}s.`)
 }
 
 /** List accounts found by previous discovery runs. */

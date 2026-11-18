@@ -17,7 +17,7 @@ import { ChatPanel } from './components/ChatPanel'
 import { QueuePanel } from './components/QueuePanel'
 import { SearchPanel } from './components/SearchPanel'
 import { ApiError, authStatus, listAccounts } from './api/client'
-import type { AccountRecord, DiscoveryResponse, DraftResponse, OAuthStatus } from './api/types'
+import type { AccountRecord, DiscoveryRunSummary, DraftResponse, OAuthStatus } from './api/types'
 
 const TITLE = 'AN APP TO HELP TA TEAM REACH OUT TO TALENTS ON X'
 
@@ -26,7 +26,7 @@ export default function App() {
   const [accounts, setAccounts] = useState<AccountRecord[]>([])
   const [selected, setSelected] = useState<AccountRecord | null>(null)
   const [queueKey, setQueueKey] = useState(0)
-  const [lastRun, setLastRun] = useState<DiscoveryResponse | null>(null)
+  const [lastRun, setLastRun] = useState<DiscoveryRunSummary | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const connected = status?.connected ?? false
@@ -66,8 +66,8 @@ export default function App() {
     }
   }, [refreshAccounts])
 
-  const handleResults = (response: DiscoveryResponse) => {
-    setLastRun(response)
+  const handleResults = (run: DiscoveryRunSummary) => {
+    setLastRun(run)
     setError(null)
     // The canonical list lives on the server; re-read it so the middle
     // column reflects exactly what the backend stored.
@@ -105,7 +105,7 @@ export default function App() {
       <main className="app-main">
         <div>
           <AuthPanel status={status} onStatusChange={setStatus} />
-          <SearchPanel onResults={handleResults} disabled={!connected} />
+          <SearchPanel onRunComplete={handleResults} disabled={!connected} />
           <QueuePanel refreshKey={queueKey} onSelectDraft={handleSelectDraft} />
         </div>
 
@@ -120,14 +120,22 @@ export default function App() {
             <section className="panel">
               <h2>Last run</h2>
               <div className="account-meta" style={{ marginBottom: 8 }}>
-                <span>{lastRun.stats.candidates} candidates</span>
-                <span>{lastRun.stats.bots_filtered} bots filtered</span>
-                <span>{lastRun.stats.returned} returned</span>
-                <span>${lastRun.stats.estimated_cost_usd.toFixed(4)}</span>
+                <span>{Number(lastRun.stats.candidates ?? 0)} candidates</span>
+                <span>{Number(lastRun.stats.bots_filtered ?? 0)} bots filtered</span>
+                <span>{Number(lastRun.stats.returned ?? 0)} returned</span>
+                <span>${Number(lastRun.stats.estimated_cost_usd ?? 0).toFixed(4)}</span>
               </div>
-              {lastRun.warnings.length > 0 && (
+              {lastRun.target_segment.length > 0 && (
+                <div className="account-meta" style={{ marginBottom: 8 }}>
+                  <span>segment: {lastRun.target_segment.join(', ')}</span>
+                </div>
+              )}
+              {typeof lastRun.stats.warnings === 'string' && (
+                <div className="alert info">{lastRun.stats.warnings}</div>
+              )}
+              {Array.isArray(lastRun.stats.warnings) && (
                 <div className="alert info">
-                  {lastRun.warnings.map((warning) => (
+                  {(lastRun.stats.warnings as string[]).map((warning) => (
                     <div key={warning}>{warning}</div>
                   ))}
                 </div>

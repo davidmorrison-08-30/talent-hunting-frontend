@@ -86,6 +86,31 @@ export interface DiscoveryResponse {
   warnings: string[]
 }
 
+/**
+ * The acknowledgement of a search that is still running.
+ *
+ * A discovery run waits on the X API and on several LLM inferences, which
+ * takes longer than an API Gateway integration may hold a connection open.
+ * The backend therefore starts the run in the background and answers with
+ * this; the client polls `poll_url` until the run leaves the running state.
+ */
+export interface DiscoveryAccepted {
+  run_id: string
+  status: string
+  poll_url: string
+}
+
+/** The status of a discovery run, as reported by the poll endpoint. */
+export interface DiscoveryRunSummary {
+  id: string
+  input_type: string
+  target_segment: string[]
+  seed_accounts: string[]
+  status: string
+  stats: Record<string, unknown>
+  created_at: string
+}
+
 export interface DraftVersion {
   version: number
   text: string
