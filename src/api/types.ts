@@ -178,4 +178,6 @@ export interface ConversationEvent {
   text: string | null
   event_type: string
   created_at: string | null
+  /** True when the operator sent this message, false when the recipient did. */
+  outbound: boolean
 }

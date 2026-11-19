@@ -6,18 +6,18 @@
  *   middle - discovered accounts
  *   right  - chat with the selected account
  *
- * The approval queue sits under the search column, because it is where the
- * human-in-the-loop work happens.
+ * There is no global approval queue: the chat panel shows the one draft the
+ * selected account is waiting on, and the operator approves it there. Moving
+ * to another account discards a draft that has not been approved yet.
  */
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { AccountList } from './components/AccountList'
 import { AuthPanel } from './components/AuthPanel'
 import { ChatPanel } from './components/ChatPanel'
-import { QueuePanel } from './components/QueuePanel'
 import { SearchPanel } from './components/SearchPanel'
-import { ApiError, authStatus, listAccounts } from './api/client'
-import type { AccountRecord, DiscoveryRunSummary, DraftResponse, OAuthStatus } from './api/types'
+import { ApiError, authStatus, deleteDraft, listAccounts } from './api/client'
+import type { AccountRecord, DiscoveryRunSummary, OAuthStatus } from './api/types'
 
 const TITLE = 'AN APP TO HELP TA TEAM REACH OUT TO TALENTS ON X'
 
@@ -25,9 +25,12 @@ export default function App() {
   const [status, setStatus] = useState<OAuthStatus | null>(null)
   const [accounts, setAccounts] = useState<AccountRecord[]>([])
   const [selected, setSelected] = useState<AccountRecord | null>(null)
-  const [queueKey, setQueueKey] = useState(0)
   const [lastRun, setLastRun] = useState<DiscoveryRunSummary | null>(null)
   const [error, setError] = useState<string | null>(null)
+
+  // The draft the selected account is waiting on. It is tracked here so a
+  // switch to another account can discard it before the chat panel moves on.
+  const pendingDraftId = useRef<string | null>(null)
 
   const connected = status?.connected ?? false
 
@@ -80,14 +83,31 @@ export default function App() {
     setSelected(null)
   }
 
-  const handleSelectDraft = (draft: DraftResponse) => {
-    const match = accounts.find((account) => account.x_user_id === draft.x_user_id)
-    if (match) {
-      setSelected(match)
+  // Switching to another account discards the draft that was still waiting
+  // for a decision, so it does not linger as an invisible pending draft that
+  // would block the next one for the same recipient.
+  const handleSelect = (account: AccountRecord | null) => {
+    const staleDraftId = pendingDraftId.current
+    pendingDraftId.current = null
+
+    if (staleDraftId) {
+      void deleteDraft(staleDraftId).catch((cause: unknown) => {
+        setError(
+          cause instanceof ApiError
+            ? `The pending draft could not be discarded: ${cause.message}`
+            : `The pending draft could not be discarded: ${String(cause)}`,
+        )
+      })
     }
+
+    setSelected(account)
   }
 
-  const refreshQueue = () => setQueueKey((key) => key + 1)
+  // The chat panel reports the draft it is holding so the parent can discard
+  // it when the operator moves to a different account.
+  const handleDraftChange = (draftId: string | null) => {
+    pendingDraftId.current = draftId
+  }
 
   return (
     <div className="app">
@@ -95,7 +115,7 @@ export default function App() {
         <div>
           <h1>{TITLE}</h1>
           <p className="subtitle">
-            Find real people on X, review evidence-backed drafts, and reach out with human approval.
+            Find real people on X, review the drafted message, and reach out with human approval.
           </p>
         </div>
         <div className="header-actions">
@@ -116,7 +136,6 @@ export default function App() {
             onSearchStarted={handleSearchStarted}
             disabled={!connected}
           />
-          <QueuePanel refreshKey={queueKey} onSelectDraft={handleSelectDraft} />
         </div>
 
         <div>
@@ -156,11 +175,11 @@ export default function App() {
             </section>
           )}
 
-          <AccountList accounts={accounts} selectedId={selected?.x_user_id ?? null} onSelect={setSelected} />
+          <AccountList accounts={accounts} selectedId={selected?.x_user_id ?? null} onSelect={handleSelect} />
         </div>
 
-        <div>
-          <ChatPanel account={selected} onQueueChanged={refreshQueue} />
+        <div className="app-column-chat">
+          <ChatPanel account={selected} onDraftChange={handleDraftChange} />
         </div>
       </main>
     </div>

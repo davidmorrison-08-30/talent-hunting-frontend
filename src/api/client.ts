@@ -187,14 +187,28 @@ export function createDraft(request: DraftPayload): Promise<DraftResponse> {
   })
 }
 
-/** Every draft awaiting a human decision. */
-export function approvalQueue(): Promise<DraftResponse[]> {
-  return apiFetch<DraftResponse[]>('/api/v1/outreach/queue')
+/**
+ * The one draft an account is waiting for a decision on.
+ *
+ * There is no global approval queue: each account has at most one unapproved
+ * draft, and the chat panel asks for it when an account is selected.
+ */
+export function getCurrentDraft(xUserId: string): Promise<DraftResponse> {
+  return apiFetch<DraftResponse>(
+    `/api/v1/outreach/drafts/current?x_user_id=${encodeURIComponent(xUserId)}`,
+  )
+}
+
+/** Discard an unapproved draft, for example when the operator switches away. */
+export function deleteDraft(recordId: string): Promise<void> {
+  return apiFetch<void>(`/api/v1/outreach/drafts/${recordId}`, {
+    method: 'DELETE',
+  })
 }
 
 /** Approve a draft and send it. */
-export function approveDraft(recordId: string, dispatch: 'blocking' | 'queued' = 'blocking'): Promise<SendResult> {
-  return apiFetch<SendResult>(`/api/v1/outreach/drafts/${recordId}/approve?dispatch=${dispatch}`, {
+export function approveDraft(recordId: string): Promise<SendResult> {
+  return apiFetch<SendResult>(`/api/v1/outreach/drafts/${recordId}/approve`, {
     method: 'POST',
   })
 }
